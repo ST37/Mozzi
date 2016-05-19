@@ -8,11 +8,15 @@
  * Mozzi by Tim Barrass is licensed under a Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License.
  *
  */
-
+ 
  #if ARDUINO >= 100
  #include "Arduino.h"
 #else
  #include "WProgram.h"
+#endif
+
+#if (USE_MCPxxxx == true)					
+#include <SPI.h>
 #endif
 
 #include <util/atomic.h>
@@ -67,7 +71,9 @@ PWM frequency tests
 //-----------------------------------------------------------------------------------------------------------------
 // ring buffer for audio output
 CircularBuffer <unsigned int> output_buffer; // fixed size 256
-
+#if (STEREO_HACK == true)
+CircularBuffer <unsigned int> output_buffer2; // fixed size 256
+#endif
 //-----------------------------------------------------------------------------------------------------------------
 
 #if defined(__MK20DX128__) || defined(__MK20DX256__) // teensy 3, 3.1
@@ -219,6 +225,9 @@ ISR(ADC_vect, ISR_BLOCK)
 }
 #endif // end main audio input section
 
+#if (STEREO_HACK == true)
+extern int audio_out_1, audio_out_2;
+#endif
 
 void audioHook() // 2us excluding updateAudio()
 {
@@ -229,8 +238,13 @@ void audioHook() // 2us excluding updateAudio()
 #endif
 
 	if (!output_buffer.isFull()) {
+#if (STEREO_HACK == true)
+		updateAudio(); // in hacked version, this returns void
+		output_buffer.write((unsigned int) (audio_out_1 + AUDIO_BIAS));
+		output_buffer2.write((unsigned int) (audio_out_2 + AUDIO_BIAS));
+#else
 		output_buffer.write((unsigned int) (updateAudio() + AUDIO_BIAS));
-
+#endif
 	}
 //setPin13Low();
 }
@@ -254,7 +268,26 @@ static void teensyAudioOutput()
 	startSecondAudioADC();
 #endif
 
+#if (USE_MCPxxxx == true)
+	PORTB &= 0b11111011; //faster digitalWrite(10,LOW);
+	uint16_t dac_out = (0b0111000000000000 | (output_buffer.read() >> 2));
+	SPI.transfer(dac_out >> 8);
+	SPI.transfer(dac_out & 255);
+	PORTB |= 0b00000100; // faster digitalWrite(10,HIGH);
+	#if (STEREO_HACK == true)
+		PORTB &= 0b11111011; //faster digitalWrite(10,LOW);
+		uint16_t dac_out2 = (0b1111000000000000 | (output_buffer2.read() >> 2));
+		SPI.transfer(dac_out2 >> 8);
+		SPI.transfer(dac_out2 & 255);
+		PORTB |= 0b00000100; // faster digitalWrite(10,HIGH);
+	#endif
+#else
 	analogWrite(AUDIO_CHANNEL_1_PIN, (int)output_buffer.read());
+	#if (STEREO_HACK == true)
+		AUDIO_CHANNEL_2_OUTPUT_REGISTER = output_buffer2.read();
+	#endif
+#endif
+	
 }
 
 
@@ -329,7 +362,26 @@ output =  output_buffer.read();
 AUDIO_CHANNEL_1_OUTPUT_REGISTER = output;
 AUDIO_CHANNEL_2_OUTPUT_REGISTER = 0;
 */
+
+#if (USE_MCPxxxx == true)
+	PORTB &= 0b11111011; //faster digitalWrite(10,LOW);
+	uint16_t dac_out = (0b0111000000000000 | (output_buffer.read() << 3));
+	SPI.transfer(dac_out >> 8);
+	SPI.transfer(dac_out & 255);
+	PORTB |= 0b00000100; // faster digitalWrite(10,HIGH);
+	#if (STEREO_HACK == true)
+		PORTB &= 0b11111011; //faster digitalWrite(10,LOW);
+		uint16_t dac_out2 = (0b1111000000000000 | (output_buffer2.read() << 3));
+		SPI.transfer(dac_out2 >> 8);
+		SPI.transfer(dac_out2 & 255);
+		PORTB |= 0b00000100; // faster digitalWrite(10,HIGH);
+	#endif
+#else
 	AUDIO_CHANNEL_1_OUTPUT_REGISTER = output_buffer.read();
+	#if (STEREO_HACK == true)
+		AUDIO_CHANNEL_2_OUTPUT_REGISTER = output_buffer2.read();
+	#endif
+#endif
 //}
 
 	// flip signal polarity - instead of signal going to 0 (both pins 0), it goes to pseudo-negative of its current value.
@@ -516,8 +568,21 @@ static void startControl(unsigned int control_rate_hz)
 }
 
 
+void testDAC() {
+
+	digitalWrite(3, HIGH);
+}
+
 void startMozzi(int control_rate_hz)
 {
+#if (USE_MCPxxxx == true)
+	pinMode (10, OUTPUT);
+	//testDAC();
+	SPI.begin();
+	//SPI.setClockDivider(10);
+	SPI.setBitOrder(MSBFIRST);
+	//SPI.setDataMode(SPI_MODE0);
+#endif
 	setupMozziADC(); // you can use setupFastAnalogRead() with FASTER or FASTEST in setup() if desired (not for Teensy 3.1)
 	// delay(200); // so AutoRange doesn't read 0 to start with
 	startControl(control_rate_hz);

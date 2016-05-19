@@ -20,6 +20,10 @@
  #include "WProgram.h"
 #endif
 
+#if defined(__MK20DX128__) || defined(__MK20DX256__)
+#include <ADC.h>
+#endif
+
 #include "mozzi_analog.h"
 
 /** @ingroup core
@@ -140,9 +144,11 @@ HIFI is not available/not required on Teensy 3.1.
 #define STANDARD_PLUS 1
 #define HIFI 2
 
-
 #include "mozzi_config.h" // User can change the config file to set audio mode
 
+#if (USE_MCPxxxx == true)
+#include <SPI.h>
+#endif
 
 // Print warning/reminder about the AUDIO_MODE setting to the arduino console while compiling
 #if AUDIO_MODE == STANDARD
@@ -253,7 +259,6 @@ interrupt (Timer 0) could be suspended while audio continues.*/
 void pauseMozzi();
 
 
-
 /** @ingroup core
 Restores Mozzi audio and control interrupts, if they have been temporarily
 disabled with pauseMozzi(). This once more takes over Timer 0, and stops the
@@ -269,8 +274,11 @@ calculations here which could be done in setup() or updateControl().
 @return an audio sample.  In STANDARD modes this is between -244 and 243 inclusive.
 In HIFI mode, it's a 14 bit number between -16384 and 16383 inclusive.
 */
+#if (STEREO_HACK == true)
+void updateAudio();
+#else
 int updateAudio();
-
+#endif
 
 /** @ingroup core
 This is where you put your control code. You need updateControl() somewhere in

@@ -5,6 +5,12 @@
 Edit this file if you want to choose your own configuration options.
 */
 
+//
+//	If using Syinsi.com EuroArdCore module
+//
+
+#define USE_MCPxxxx true
+#define STEREO_HACK true
 
 /**  @ingroup core
 AUDIO_MODE holds the audio mode setting.
@@ -58,8 +64,8 @@ and comment out \#define AUDIO_MODE STANDARD and \#define AUDIO_MODE STANDARD_PL
 http://blog.makezine.com/2008/05/29/makeit-protodac-shield-fo/ .
 Mozzi-users list has a thread on this.
 */
-#define AUDIO_RATE 16384
-//#define AUDIO_RATE 32768
+//#define AUDIO_RATE 16384
+#define AUDIO_RATE 32768
 
 
 
